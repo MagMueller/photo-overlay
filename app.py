@@ -1,6 +1,5 @@
-from flask import Flask, request, render_template, send_file
-from PIL import Image, ImageDraw, ImageFont
-import io
+from flask import Flask, render_template, request, send_file
+from PIL import Image
 import os
 
 app = Flask(__name__)
@@ -13,28 +12,36 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload():
+    if 'file' not in request.files:
+        return 'No file part'
     file = request.files['file']
-    color = request.form['color']
-    img = Image.open(file.stream)
+    if file.filename == '':
+        return 'No selected file'
+    if file:
+        # Save the uploaded file
+        file_path = os.path.join('static/images', file.filename)
+        file.save(file_path)
 
-    draw = ImageDraw.Draw(img)
-    font = ImageFont.load_default()
+        # Open the uploaded image and the template image
+        uploaded_image = Image.open(file_path).convert("RGBA")
+        template_image = Image.open('static/images/Template.png').convert("RGBA")
 
-    text1 = "100% AI generated"
-    text2 = "RealFakePhotos.com"
+        # Ensure both images are the same size
+        uploaded_image = uploaded_image.resize(template_image.size)
 
-    # Coordinates for the text
-    text1_position = (50, img.height - 150)
-    text2_position = (50, img.height - 100)
+        # Composite the images
+        result_image = Image.alpha_composite(uploaded_image, template_image)
 
-    draw.text(text1_position, text1, fill=color, font=font)
-    draw.text(text2_position, text2, fill=color, font=font)
+        # Save the result
+        result_path = os.path.join('static/images', 'result.png')
+        result_image.save(result_path)
 
-    img_io = io.BytesIO()
-    img.save(img_io, 'PNG')
-    img_io.seek(0)
+        return render_template('result.html', result_image='static/images/result.png')
 
-    return send_file(img_io, mimetype='image/png')
+
+@app.route('/download')
+def download():
+    return send_file('static/images/result.png', as_attachment=True)
 
 
 if __name__ == '__main__':
